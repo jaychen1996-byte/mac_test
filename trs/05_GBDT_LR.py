@@ -31,7 +31,7 @@ warnings.filterwarnings('ignore')
 
 """数据读取与预处理"""
 # 数据读取
-path = 'data/'
+path = '../data/'
 df_train = pd.read_csv(path + 'kaggle_train.csv')
 df_test = pd.read_csv(path + 'kaggle_test.csv')
 

@@ -76,7 +76,7 @@ def FM(feature_dim):
 
 # 读取数据
 print('loading data...')
-data = pd.read_csv('./data/kaggle_train.csv')
+data = pd.read_csv('../data/kaggle_train.csv')
 
 # dense 特征开头是I，sparse特征开头是C，Label是标签
 cols = data.columns.values

@@ -186,7 +186,7 @@ def User_CF_Rec(trn_user_items, val_user_items, K, N):
 
 
 if __name__ == "__main__":
-    root_path = './data/ml-1m/'
+    root_path = '../data/ml-1m/'
     trn_user_items, val_user_items = get_data(root_path)
     rec_items = User_CF_Rec(trn_user_items, val_user_items, 80, 10)
     rec_eval(rec_items, val_user_items, trn_user_items)

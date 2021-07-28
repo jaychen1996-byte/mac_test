@@ -164,7 +164,7 @@ if __name__ == "__main__":
     N = 10
 
     # 读取数据
-    root_path = './data/ml-1m/'
+    root_path = '../data/ml-1m/'
     trn_user_items, val_user_items, trn_data, val_data, data = get_data(root_path)
 
     # 模型保存的名称
