@@ -202,7 +202,7 @@ def PNN(dnn_feature_columns, inner=True, outer=True):
 # 实现PNN的时候一定要明确是实现优化前的还是优化后的，因为网上有的参考代码是优化前的，有的是优化后的，容易搞混了
 if __name__ == "__main__":
     # 读取数据
-    data = pd.read_csv('./data/criteo_sample.txt')
+    data = pd.read_csv('../data/criteo_sample.txt')
 
     # 划分dense和sparse特征
     columns = data.columns.values

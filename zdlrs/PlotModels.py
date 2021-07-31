@@ -34,7 +34,7 @@ def data_process(data_df, dense_features, sparse_features):
 # 读取criteo数据
 def read_criteo_data():
     # 读取数据
-    data = pd.read_csv('./data/criteo_sample.txt')
+    data = pd.read_csv('../data/criteo_sample.txt')
 
     # 划分dense和sparse特征
     columns = data.columns.values
@@ -56,7 +56,7 @@ def plot_deepcrossing():
 
     # 构建DeepCrossing模型
     history = DeepCrossing(dnn_feature_columns)
-    keras.utils.plot_model(history, to_file="./imgs/DeepCrossing.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/DeepCrossing.png", show_shapes=True)
 
 
 def plot_deepfm():
@@ -76,7 +76,7 @@ def plot_deepfm():
 
     # 构建DeepFM模型
     history = DeepFM(linear_feature_columns, dnn_feature_columns)
-    keras.utils.plot_model(history, to_file="./imgs/DeepFM.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/DeepFM.png", show_shapes=True)
 
 
 def plot_nfm():
@@ -96,7 +96,7 @@ def plot_nfm():
 
     # 构建NFM模型
     history = NFM(linear_feature_columns, dnn_feature_columns)
-    keras.utils.plot_model(history, to_file="./imgs/NFM.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/NFM.png", show_shapes=True)
 
 
 def plot_widendeep():
@@ -116,12 +116,12 @@ def plot_widendeep():
 
     # 构建WideNDeep模型
     history = WideNDeep(linear_feature_columns, dnn_feature_columns)
-    keras.utils.plot_model(history, to_file="./imgs/Wide&Deep.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/Wide&Deep.png", show_shapes=True)
 
 
 def plot_din():
     # 读取数据
-    samples_data = pd.read_csv("./data/movie_sample.txt", sep="\t", header = None)
+    samples_data = pd.read_csv("../data/movie_sample.txt", sep="\t", header = None)
     samples_data.columns = ["user_id", "gender", "age", "hist_movie_id", "hist_len", "movie_id", "movie_type_id", "label"]
 
     feature_columns = [SparseFeat('user_id', max(samples_data["user_id"])+1, embedding_dim=8), 
@@ -139,7 +139,7 @@ def plot_din():
     behavior_seq_feature_list = ['hist_movie_id']
 
     history = DIN(feature_columns, behavior_feature_list, behavior_seq_feature_list)
-    keras.utils.plot_model(history, to_file="./imgs/DIN.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/DIN.png", show_shapes=True)
 
 
 def plot_pnn():
@@ -154,13 +154,13 @@ def plot_pnn():
 
     # 构建DeepCrossing模型
     history = PNN(dnn_feature_columns)
-    keras.utils.plot_model(history, to_file="./imgs/PNN.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/PNN.png", show_shapes=True)
 
 
 def plot_ncf():
     # 读取数据，NCF使用的特征只有user_id和item_id
     rnames = ['user_id','movie_id','rating','timestamp']
-    data = pd.read_csv('./data/ml-1m/ratings.dat', sep='::', engine='python', names=rnames)
+    data = pd.read_csv('../data/ml-1m/ratings.dat', sep='::', engine='python', names=rnames)
 
     lbe = LabelEncoder()
     data['user_id'] = lbe.fit_transform(data['user_id'])
@@ -171,7 +171,7 @@ def plot_ncf():
 
     # 构建FM模型
     history = NCF(dnn_feature_columns)
-    keras.utils.plot_model(history, to_file="./imgs/NCF.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/NCF.png", show_shapes=True)
 
 
 def plot_dcn():
@@ -191,7 +191,7 @@ def plot_dcn():
 
     # 构建AFM模型
     history = DCN(linear_feature_columns, dnn_feature_columns)
-    keras.utils.plot_model(history, to_file="./imgs/DCN.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/DCN.png", show_shapes=True)
 
 
 def plot_afm():
@@ -211,12 +211,12 @@ def plot_afm():
 
     # 构建AFM模型
     history = AFM(linear_feature_columns, dnn_feature_columns)
-    keras.utils.plot_model(history, to_file="./imgs/AFM.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/AFM.png", show_shapes=True)
 
 
 def plot_dien():
     """读取数据"""
-    samples_data = pd.read_csv("data/movie_sample.txt", sep="\t", header = None)
+    samples_data = pd.read_csv("../data/movie_sample.txt", sep="\t", header = None)
     samples_data.columns = ["user_id", "gender", "age", "hist_movie_id", "hist_len", "movie_id", "movie_type_id", "label"]
 
     """数据集"""
@@ -244,7 +244,7 @@ def plot_dien():
     """构建DIN模型"""
     history = DIEN(feature_columns, behavior_feature_list, behavior_seq_feature_list, neg_seq_feature_list, use_neg_sample=True)
     
-    keras.utils.plot_model(history, to_file="./imgs/DIEN.png", show_shapes=True)
+    keras.utils.plot_model(history, to_file="../imgs/DIEN.png", show_shapes=True)
 
  
 if __name__ == '__main__':

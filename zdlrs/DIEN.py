@@ -397,7 +397,7 @@ def get_neg_click(data_df, neg_num=10):
 
 if __name__ == "__main__":
     """读取数据"""
-    samples_data = pd.read_csv("data/movie_sample.txt", sep="\t", header = None)
+    samples_data = pd.read_csv("../data/movie_sample.txt", sep="\t", header = None)
     samples_data.columns = ["user_id", "gender", "age", "hist_movie_id", "hist_len", "movie_id", "movie_type_id", "label"]
 
     """数据集"""

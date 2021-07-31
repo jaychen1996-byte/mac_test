@@ -93,7 +93,7 @@ def NCF(dnn_feature_columns):
 if __name__ == "__main__":
     # 读取数据，NCF使用的特征只有user_id和item_id
     rnames = ['user_id','movie_id','rating','timestamp']
-    data = pd.read_csv('./data/ml-1m/ratings.dat', sep='::', engine='python', names=rnames)
+    data = pd.read_csv('../data/ml-1m/ratings.dat', sep='::', engine='python', names=rnames)
 
     lbe = LabelEncoder()
     data['user_id'] = lbe.fit_transform(data['user_id'])

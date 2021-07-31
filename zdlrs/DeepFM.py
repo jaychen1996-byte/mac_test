@@ -186,7 +186,7 @@ def DeepFM(linear_feature_columns, dnn_feature_columns):
 
 if __name__ == "__main__":
     # 读取数据
-    data = pd.read_csv('./data/criteo_sample.txt')
+    data = pd.read_csv('../data/criteo_sample.txt')
 
     # 划分dense和sparse特征
     columns = data.columns.values

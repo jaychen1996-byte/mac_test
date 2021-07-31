@@ -60,32 +60,6 @@ def build_embedding_layers(feature_columns, input_layers_dict, is_linear):
     return embedding_layers_dict
 
 
-def get_linear_logits(dense_input_dict, sparse_input_dict, sparse_feature_columns):
-    # 将所有的dense特征的Input层，然后经过一个全连接层得到dense特征的logits
-    concat_dense_inputs = Concatenate(axis=1)(list(dense_input_dict.values()))
-    dense_logits_output = Dense(1)(concat_dense_inputs)
-    
-    # 获取linear部分sparse特征的embedding层，这里使用embedding的原因是：
-    # 对于linear部分直接将特征进行onehot然后通过一个全连接层，当维度特别大的时候，计算比较慢
-    # 使用embedding层的好处就是可以通过查表的方式获取到哪些非零的元素对应的权重，然后在将这些权重相加，效率比较高
-    linear_embedding_layers = build_embedding_layers(sparse_feature_columns, sparse_input_dict, is_linear=True)
-    
-    # 将一维的embedding拼接，注意这里需要使用一个Flatten层，使维度对应
-    sparse_1d_embed = []
-    for fc in sparse_feature_columns:
-        feat_input = sparse_input_dict[fc.name]
-        embed = Flatten()(linear_embedding_layers[fc.name](feat_input)) # B x 1
-        sparse_1d_embed.append(embed)
-
-    # embedding中查询得到的权重就是对应onehot向量中一个位置的权重，所以后面不用再接一个全连接了，本身一维的embedding就相当于全连接
-    # 只不过是这里的输入特征只有0和1，所以直接向非零元素对应的权重相加就等同于进行了全连接操作(非零元素部分乘的是1)
-    sparse_logits_output = Add()(sparse_1d_embed)
-
-    # 最终将dense特征和sparse特征对应的logits相加，得到最终linear的logits
-    linear_logits = Add()([dense_logits_output, sparse_logits_output])
-    return linear_logits
-
-
 # 将所有的sparse特征embedding拼接
 def concat_embedding_list(feature_columns, input_layer_dict, embedding_layer_dict, flatten=False):
     # 将sparse特征筛选出来
@@ -106,53 +80,75 @@ def concat_embedding_list(feature_columns, input_layer_dict, embedding_layer_dic
     return embedding_list 
 
 
-def get_dnn_logits(dense_input_dict, sparse_input_dict, sparse_feature_columns, dnn_embedding_layers):
-    concat_dense_inputs = Concatenate(axis=1)(list(dense_input_dict.values())) # B x n1 (n表示的是dense特征的维度) 
+def get_dnn_output(dnn_input):
 
-    sparse_kd_embed = concat_embedding_list(sparse_feature_columns, sparse_input_dict, dnn_embedding_layers, flatten=True)
+    # dnn层，这里的Dropout参数，Dense中的参数都可以自己设定
+    fc_layer = Dropout(0.5)(Dense(1024, activation='relu')(dnn_input))  
+    fc_layer = Dropout(0.3)(Dense(512, activation='relu')(fc_layer))
+    dnn_out = Dropout(0.1)(Dense(256, activation='relu')(fc_layer))
 
-    concat_sparse_kd_embed = Concatenate(axis=1)(sparse_kd_embed) # B x n2k  (n2表示的是Sparse特征的维度)
+    return dnn_out
 
-    dnn_input = Concatenate(axis=1)([concat_dense_inputs, concat_sparse_kd_embed]) # B x (n2k + n1)
 
-    # dnn层，这里的Dropout参数，Dense中的参数及Dense的层数都可以自己设定
-    dnn_out = Dropout(0.5)(Dense(1024, activation='relu')(dnn_input))  
-    dnn_out = Dropout(0.3)(Dense(512, activation='relu')(dnn_out))
-    dnn_out = Dropout(0.1)(Dense(256, activation='relu')(dnn_out))
+class CrossNet(Layer):
+    def __init__(self, layer_nums=3):
+        super(CrossNet, self).__init__()
+        self.layer_nums = layer_nums
 
-    dnn_logits = Dense(1)(dnn_out)
+    def build(self, input_shape):
+        # 计算w的维度，w的维度与输入数据的最后一个维度相同
+        self.dim = int(input_shape[-1])
 
-    return dnn_logits
+        # 注意，在DCN中W不是一个矩阵而是一个向量，这里根据残差的层数定义一个权重列表
+        self.W = [self.add_weight(name='W_' + str(i), shape=(self.dim,)) for i in range(self.layer_nums)]
+        self.b = [self.add_weight(name='b_' + str(i),shape=(self.dim,), initializer='zeros') for i in range(self.layer_nums)]
 
-# Wide&Deep 模型的wide部分及Deep部分的特征选择，应该根据实际的业务场景去确定哪些特征应该放在Wide部分，哪些特征应该放在Deep部分
-def WideNDeep(linear_feature_columns, dnn_feature_columns):
+    def call(self, inputs):
+
+        # 进行特征交叉时的x_0一直没有变，变的是x_l和每一层的权重
+        x_0 = inputs # B x dims 
+        x_l = x_0
+        for i in range(self.layer_nums):
+            # 将x_l的第一个维度与w[i]的第0个维度计算点积
+            xl_w = tf.tensordot(x_l, self.W[i], axes=(1, 0)) # B, 
+            xl_w = tf.expand_dims(xl_w, axis=-1) # 在最后一个维度上添加一个维度 # B x 1
+            cross = tf.multiply(x_0, xl_w) # B x dims
+            x_l = cross + self.b[i] + x_l
+        
+        return x_l
+
+
+def DCN(linear_feature_columns, dnn_feature_columns):
     # 构建输入层，即所有特征对应的Input()层，这里使用字典的形式返回，方便后续构建模型
     dense_input_dict, sparse_input_dict = build_input_layers(linear_feature_columns + dnn_feature_columns)
-
-    # 将linear部分的特征中sparse特征筛选出来，后面用来做1维的embedding
-    linear_sparse_feature_columns = list(filter(lambda x: isinstance(x, SparseFeat), linear_feature_columns))
 
     # 构建模型的输入层，模型的输入层不能是字典的形式，应该将字典的形式转换成列表的形式
     # 注意：这里实际的输入与Input()层的对应，是通过模型输入时候的字典数据的key与对应name的Input层
     input_layers = list(dense_input_dict.values()) + list(sparse_input_dict.values())
 
-    # Wide&Deep模型论文中Wide部分使用的特征比较简单，并且得到的特征非常的稀疏，所以使用了FTRL优化Wide部分（这里没有实现FTRL）
-    # 但是是根据他们业务进行选择的，我们这里将所有可能用到的特征都输入到Wide部分，具体的细节可以根据需求进行修改
-    linear_logits = get_linear_logits(dense_input_dict, sparse_input_dict, linear_sparse_feature_columns)
-    
     # 构建维度为k的embedding层，这里使用字典的形式返回，方便后面搭建模型
-    embedding_layers = build_embedding_layers(dnn_feature_columns, sparse_input_dict, is_linear=False)
+    embedding_layer_dict = build_embedding_layers(dnn_feature_columns, sparse_input_dict, is_linear=False)
 
-    dnn_sparse_feature_columns = list(filter(lambda x: isinstance(x, SparseFeat), dnn_feature_columns))
+    concat_dense_inputs = Concatenate(axis=1)(list(dense_input_dict.values()))
 
-    # 在Wide&Deep模型中，deep部分的输入是将dense特征和embedding特征拼在一起输入到dnn中
-    dnn_logits = get_dnn_logits(dense_input_dict, sparse_input_dict, dnn_sparse_feature_columns, embedding_layers)
+    # 将特征中的sparse特征筛选出来
+    sparse_feature_columns = list(filter(lambda x: isinstance(x, SparseFeat), linear_feature_columns)) if linear_feature_columns else []
+
+    sparse_kd_embed = concat_embedding_list(sparse_feature_columns, sparse_input_dict, embedding_layer_dict, flatten=True)
+
+    concat_sparse_kd_embed = Concatenate(axis=1)(sparse_kd_embed)   
+
+    dnn_input = Concatenate(axis=1)([concat_dense_inputs, concat_sparse_kd_embed])
+
+    dnn_output = get_dnn_output(dnn_input)
     
-    # 将linear,dnn的logits相加作为最终的logits
-    output_logits = Add()([linear_logits, dnn_logits])
+    cross_output = CrossNet()(dnn_input)
+
+    # stack layer
+    stack_output = Concatenate(axis=1)([dnn_output, cross_output])
 
     # 这里的激活函数使用sigmoid
-    output_layer = Activation("sigmoid")(output_logits)
+    output_layer = Dense(1, activation='sigmoid')(stack_output)
 
     model = Model(input_layers, output_layer)
     return model
@@ -160,7 +156,7 @@ def WideNDeep(linear_feature_columns, dnn_feature_columns):
 
 if __name__ == "__main__":
     # 读取数据
-    data = pd.read_csv('./data/criteo_sample.txt')
+    data = pd.read_csv('../data/criteo_sample.txt')
 
     # 划分dense和sparse特征
     columns = data.columns.values
@@ -180,8 +176,8 @@ if __name__ == "__main__":
                             for i,feat in enumerate(sparse_features)] + [DenseFeat(feat, 1,)
                             for feat in dense_features]
 
-    # 构建WideNDeep模型
-    history = WideNDeep(linear_feature_columns, dnn_feature_columns)
+    # 构建DCN模型
+    history = DCN(linear_feature_columns, dnn_feature_columns)
     history.summary()
     history.compile(optimizer="adam", 
                 loss="binary_crossentropy", 
@@ -191,4 +187,6 @@ if __name__ == "__main__":
     train_model_input = {name: data[name] for name in dense_features + sparse_features}
     # 模型训练
     history.fit(train_model_input, train_data['label'].values,
-            batch_size=64, epochs=5, validation_split=0.2, )    
+            batch_size=32, epochs=5, validation_split=0.2, )
+
+
